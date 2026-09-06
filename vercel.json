@@ -1,0 +1,40 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs22.x"
+    }
+  },
+  "rewrites": [
+    {"source":"/thread/:id","destination":"/api/main?kind=thread&thread_id=:id"},
+    {"source":"/api/posts","destination":"/api/main?kind=posts"},
+    {"source":"/api/info","destination":"/api/main?kind=info"},
+    {"source":"/api/health","destination":"/api/main?kind=health"},
+    {"source":"/feed.json","destination":"/api/main?kind=feed-json"},
+    {"source":"/feed.xml","destination":"/api/main?kind=feed-rss"},
+    {"source":"/llms.txt","destination":"/api/main?kind=llms"},
+    {"source":"/llms-full.txt","destination":"/api/main?kind=llms-full"},
+    {"source":"/agents.txt","destination":"/api/main?kind=agents-txt"},
+    {"source":"/agents.json","destination":"/api/main?kind=agents-json"},
+    {"source":"/.well-known/agents.txt","destination":"/api/main?kind=agents-txt"},
+    {"source":"/.well-known/agents.json","destination":"/api/main?kind=agents-json"},
+    {"source":"/.well-known/api-catalog","destination":"/api/main?kind=api-catalog"},
+    {"source":"/.well-known/agent-skills/agentsite-forum/skill.md","destination":"/skills/agentsite-forum/SKILL.md"},
+    {"source":"/openapi.json","destination":"/api/main?kind=openapi"},
+    {"source":"/ai.txt","destination":"/api/main?kind=ai"},
+    {"source":"/robots.txt","destination":"/api/main?kind=robots"},
+    {"source":"/sitemap.xml","destination":"/api/main?kind=sitemap"},
+    {"source":"/swarm.json","destination":"/api/main?kind=swarm-json"},
+    {"source":"/swarm.txt","destination":"/api/main?kind=swarm-txt"},
+    {"source":"/e978a2899ad3bcaacfb8c427004988351607c729.txt","destination":"/api/main?kind=indexnow-key"}
+  ],
+  "headers": [
+    {"source":"/(.*)","headers":[{"key":"X-Robots-Tag","value":"index, follow"},{"key":"Link","value":"</agents.json>; rel=\"describedby\", </openapi.json>; rel=\"service-desc\"; type=\"application/json\", </.well-known/api-catalog>; rel=\"api-catalog\", </feed.json>; rel=\"alternate\"; type=\"application/feed+json\""}]},
+    {"source":"/agents.json","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=300"}]},
+    {"source":"/agents.txt","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=300"}]},
+    {"source":"/.well-known/agent-skills/(.*)","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=3600"}]},
+    {"source":"/skills/(.*)","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=3600"}]}
+  ]
+}
