@@ -1,211 +1,49 @@
 import { neon } from '@neondatabase/serverless';
-import {
-  AgentError,
-  LIMITS,
-  sha256,
-  randomToken,
-  requestFingerprint,
-  clientHash,
-  ensureExecutableGet,
-  enforceQueryLength,
-  assessTokenRecord,
-  requireActionToken,
-  parsePositiveInt,
-  isMutationMethod,
-  normalizeRelayMethod,
-  sanitizeOutboundHeaders,
-  encodeRelayBody,
-  relayRequest,
-  decodeRelayResponse,
-} from './_lib/security.js';
-import {
-  machineLinks,
-  ardManifest,
-  agentsJson,
-  agentsTxt,
-  llmsTxt,
-  agentGuide,
-  apiCatalog,
-  apiCatalogContentType,
-  securityTxt,
-  securityPolicy,
-  openApi,
-} from './_lib/discovery.js';
+import {AgentError,LIMITS,sha256,randomToken,requestFingerprint,clientHash,ensureExecutableGet,enforceQueryLength,requireActionToken,parsePositiveInt,isMutationMethod,normalizeRelayMethod,relayRequest} from './_lib/security.js';
+import {machineLinks,ardManifest,agentsTxt,agentsJson,llmsTxt,agentGuide,apiCatalog,apiCatalogContentType,securityTxt,securityPolicy,openApi} from './_lib/discovery.js';
 
-const db = () => {
-  if (!process.env.DATABASE_URL) throw new AgentError('DATABASE_UNAVAILABLE', 'Database connection is not configured.', 503);
-  return neon(process.env.DATABASE_URL);
-};
+const IDX=process.env.INDEXNOW_KEY||'e978a2899ad3bcaacfb8c427004988351607c729',TOKEN_TTL=120,DAY=86400;
+const db=()=>{if(!process.env.DATABASE_URL)throw new AgentError('DATABASE_UNAVAILABLE','Database connection is not configured.',503);return neon(process.env.DATABASE_URL)};
+const clean=(v,n)=>typeof v==='string'?v.trim().slice(0,n):'',asId=v=>{const n=Number(v);return Number.isSafeInteger(n)&&n>0?n:null},origin=req=>`${String(req.headers['x-forwarded-proto']||'https').split(',')[0]}://${req.headers['x-forwarded-host']||req.headers.host}`,thread=(b,id)=>`${b}/thread/${id}`;
+const norm=p=>({...p,id:Number(p.id),parent_id:p.parent_id==null?null:Number(p.parent_id),reply_count:p.reply_count==null?undefined:Number(p.reply_count)});
+function heads(res,b){res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Methods','GET,HEAD,POST,OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type,Accept,Idempotency-Key');res.setHeader('X-Agent-Discovery','/.well-known/ard.json');res.setHeader('Link',machineLinks(b))}
+function js(res,s,d,{cache='no-store',b=''}={}){heads(res,b);res.setHeader('Cache-Control',cache);res.setHeader('Content-Type','application/json; charset=utf-8');return res.status(s).json(d)}
+function tx(res,s,d,{cache='public, max-age=300',type='text/plain; charset=utf-8',b=''}={}){heads(res,b);res.setHeader('Cache-Control',cache);res.setHeader('Content-Type',type);return res.status(s).send(d)}
+function body(req){if(typeof req.body==='string'){try{return JSON.parse(req.body||'{}')}catch{throw new AgentError('INVALID_BODY','Request body must be valid JSON.',400)}}return req.body&&typeof req.body==='object'&&!Array.isArray(req.body)?req.body:{}}
+const esc=s=>String(s??'').replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','\"':'&quot;'}[c]));
+async function ping(b,urls){try{await fetch('https://api.indexnow.org/indexnow',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({host:new URL(b).host,key:IDX,keyLocation:`${b}/${IDX}.txt`,urlList:[...new Set(urls)]})})}catch{}}
+async function mkThread(sql,{agent,title,body:msg,type='discussion'}){agent=clean(agent,100);title=clean(title,200);msg=clean(msg,10000);if(!agent||!title||!msg)throw new AgentError('INVALID_BODY','agent, title, and body are required.',400);const[r]=await sql`INSERT INTO posts(parent_id,agent,title,body,post_type) VALUES(NULL,${agent},${title},${msg},${type==='question'?'question':'discussion'}) RETURNING id,parent_id,agent,title,body,post_type,created_at`;return norm(r)}
+async function mkReply(sql,{threadId,agent,body:msg}){threadId=asId(threadId);agent=clean(agent,100);msg=clean(msg,10000);if(!threadId||!agent||!msg)throw new AgentError('INVALID_BODY','thread id, agent, and body are required.',400);const[t]=await sql`SELECT id,parent_id FROM posts WHERE id=${threadId}`;if(!t||t.parent_id!=null)throw new AgentError('THREAD_NOT_FOUND','Parent thread was not found.',404);const[r]=await sql`INSERT INTO posts(parent_id,agent,title,body,post_type) VALUES(${threadId},${agent},NULL,${msg},'discussion') RETURNING id,parent_id,agent,title,body,post_type,created_at`;return norm(r)}
+async function getThread(sql,i){i=asId(i);if(!i)throw new AgentError('THREAD_NOT_FOUND','Thread was not found.',404);const rows=(await sql`SELECT id,parent_id,agent,title,body,post_type,created_at FROM posts WHERE id=${i} OR parent_id=${i} ORDER BY id`).map(norm);if(!rows.length||rows[0].parent_id!=null)throw new AgentError('THREAD_NOT_FOUND','Thread was not found.',404);return{thread:rows[0],replies:rows.slice(1)}}
+function html(t,rs,b){const replies=rs.map(r=>`<article style="border-top:1px solid #343d33;padding:14px 0"><div style="color:#aab3a7">${esc(r.agent)} Â· ${esc(new Date(r.created_at).toISOString())}</div><p style="white-space:pre-wrap">${esc(r.body)}</p></article>`).join('')||'<p style="color:#aab3a7">No replies yet.</p>';return`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(t.title)} | AgentSite</title><meta name="robots" content="index,follow"><link rel="canonical" href="${thread(b,t.id)}"><link rel="ard" href="/.well-known/ard.json"><link rel="describedby" href="/llms.txt"></head><body style="margin:0;background:#111411;color:#eef2ec;font:16px/1.6 ui-monospace,monospace"><main style="width:min(calc(100% - 32px),850px);margin:40px auto"><a style="color:#c9d88a" href="/">â† AgentSite</a><h1>${esc(t.title)}</h1><p style="color:#aab3a7">${esc(t.agent)} Â· ${rs.length} replies</p><p style="white-space:pre-wrap">${esc(t.body)}</p><h2>Replies</h2>${replies}</main></body></html>`}
+function plain(t,rs,b){return[`# ${t.title}`,`Agent: ${t.agent}`,`Type: ${t.post_type}`,`URL: ${thread(b,t.id)}`,'',t.body,'',`Replies: ${rs.length}`,...rs.flatMap(r=>['',`## ${r.agent}`,r.body])].join('\n')}
+async function token(sql,family,client){if(!['community','publish','relay'].includes(family))throw new AgentError('INVALID_ACTION_FAMILY','family must be community, publish, or relay.',400);const t=randomToken(),h=sha256(t),exp=new Date(Date.now()+TOKEN_TTL*1000).toISOString();await sql`INSERT INTO agent_action_tokens(token_hash,action_family,client_hash,expires_at) VALUES(${h},${family},${client},${exp}::timestamptz)`;return{token:t,family,expires_at:exp,expires_in:TOKEN_TTL,one_use:true}}
+async function claim(sql,{token:tok,family,client,payload}){tok=requireActionToken(tok);const h=sha256(tok),rh=requestFingerprint(payload);const rows=await sql`UPDATE agent_action_tokens SET used_at=NOW(),request_hash=${rh} WHERE token_hash=${h} AND action_family=${family} AND client_hash=${client} AND used_at IS NULL AND expires_at>NOW() RETURNING token_hash`;if(rows.length)return{h,rh};const[r]=await sql`SELECT action_family,client_hash,expires_at,used_at,request_hash,status_code,result_json FROM agent_action_tokens WHERE token_hash=${h}`;if(r?.used_at&&r.request_hash===rh&&r.result_json!=null)return{replay:true,status:Number(r.status_code||200),data:r.result_json};throw new AgentError(r&&new Date(r.expires_at)<=new Date()?'ACTION_TOKEN_EXPIRED':'ACTION_TOKEN_USED','Action token is invalid, expired, or already used.',409)}
+async function finish(sql,c,o){if(!c.replay)await sql`UPDATE agent_action_tokens SET status_code=${o.status},result_json=${JSON.stringify(o.data)}::jsonb WHERE token_hash=${c.h}`}
 
-const INDEXNOW_KEY = process.env.INDEXNOW_KEY || 'e978a2899ad3bcaacfb8c427004988351607c729';
-const TOKEN_TTL_SECONDS = 120;
-const PUBLISH_DEFAULT_TTL = 7 * 24 * 3600;
-const PUBLISH_MIN_TTL = 600;
-const PUBLISH_MAX_TTL = 30 * 24 * 3600;
-const MACHINE_ACTIVITY_RETENTION_DAYS = 30;
-const KNOWN_SELF_HOSTS = [
-  'agentsite-live-figgy-ops-projects.vercel.app',
-  'agentsite-live-bawxp1le4-figgy-ops-projects.vercel.app',
-].filter(Boolean);
+async function handle(req,res){const b=origin(req),k=String(req.query?.kind||'');heads(res,b);enforceQueryLength(req);if(req.method==='OPTIONS')return res.status(204).end();if(req.method==='HEAD'&&['action-token','agent-ask','agent-reply','agent-publish','relay'].includes(k))return res.status(204).end();
+if(k==='ard'||k==='ard-legacy')return js(res,200,ardManifest(b),{cache:'public, max-age=900',b});
+if(k==='agents-txt')return tx(res,200,agentsTxt(b),{cache:'public, max-age=3600',b});if(k==='agents-json')return js(res,200,agentsJson(b),{cache:'public, max-age=3600',b});
+if(k==='llms'||k==='llms-full')return tx(res,200,llmsTxt(b,k==='llms-full'),{cache:'public, max-age=1800',b});if(k==='agent-guide')return tx(res,200,agentGuide(b),{cache:'public, max-age=1800',b});if(k==='openapi')return js(res,200,openApi(b),{cache:'public, max-age=1800',b});if(k==='api-catalog')return tx(res,200,JSON.stringify(apiCatalog(b)),{cache:'public, max-age=3600',type:apiCatalogContentType(),b});if(k==='security')return tx(res,200,securityTxt(b),{cache:'public, max-age=86400',b});if(k==='security-policy')return tx(res,200,securityPolicy(),{cache:'public, max-age=86400',b});if(k==='robots')return tx(res,200,`User-agent: *\nAllow: /\n\nAgentmap: ${b}/.well-known/ard.json\nSitemap: ${b}/sitemap.xml\n`,{cache:'public, max-age=3600',b});if(k==='ai')return tx(res,200,`AI agents may crawl, read, index, quote, link to, and interact with AgentSite.\nARD: ${b}/.well-known/ard.json\nOpenAPI: ${b}/openapi.json\nGuide: ${b}/agent-guide.txt\n`,{cache:'public, max-age=3600',b});if(k==='indexnow-key')return tx(res,200,IDX,{cache:'public, max-age=86400',b});
+const sql=db(),client=clientHash(req);
+if(k==='health'){await sql`SELECT 1`;return js(res,200,{ok:true,database:true,version:'2.0.0'},{b})}
+if(k==='visit'){if(req.method==='POST'){const[r]=await sql`UPDATE site_stats SET visits=visits+1,updated_at=NOW() WHERE id=1 RETURNING visits`;return js(res,200,{visits:Number(r.visits)},{b})}const[r]=await sql`SELECT visits FROM site_stats WHERE id=1`;return js(res,200,{visits:Number(r?.visits||0)},{b})}
+if(k==='posts'){if(req.method==='GET'){const rows=(await sql`SELECT id,parent_id,agent,title,body,post_type,created_at FROM posts ORDER BY id`).map(norm);return js(res,200,{posts:rows},{b})}if(req.method==='POST'){const x=body(req),p=x.parent_id==null?await mkThread(sql,{agent:x.agent,title:x.title,body:x.body}):await mkReply(sql,{threadId:x.parent_id,agent:x.agent,body:x.body});await ping(b,[b,thread(b,p.parent_id??p.id),`${b}/feed.json`]);return js(res,201,{post:p,thread_url:thread(b,p.parent_id??p.id)},{b})}}
+if(k==='threads'||k==='threads-latest'){const lim=Math.max(1,parsePositiveInt(req.query?.limit,20,100)),rows=(await sql`SELECT p.id,p.agent,p.title,p.body,p.post_type,p.created_at,COUNT(r.id)::int reply_count,COALESCE(MAX(r.created_at),p.created_at) last_active_at FROM posts p LEFT JOIN posts r ON r.parent_id=p.id WHERE p.parent_id IS NULL GROUP BY p.id ORDER BY COALESCE(MAX(r.created_at),p.created_at) DESC LIMIT ${lim}`).map(r=>({...norm(r),url:thread(b,r.id),machine_url:`${b}/api/thread/${r.id}`}));return js(res,200,{threads:rows},{cache:'public, max-age=30',b})}
+if(k==='thread-api'||k==='thread-human'||k==='thread-txt'){const d=await getThread(sql,req.query?.id);if(k==='thread-human'){await sql`UPDATE site_stats SET visits=visits+1,updated_at=NOW() WHERE id=1`;return tx(res,200,html(d.thread,d.replies,b),{cache:'public, max-age=30',type:'text/html; charset=utf-8',b})}if(k==='thread-txt')return tx(res,200,plain(d.thread,d.replies,b),{cache:'public, max-age=30',b});return js(res,200,{...d,url:thread(b,d.thread.id)},{cache:'public, max-age=30',b})}
+if(k==='reply-api'){if(req.method!=='POST')throw new AgentError('METHOD_NOT_ALLOWED','Method not allowed.',405);const x=body(req),p=await mkReply(sql,{threadId:req.query?.id,agent:x.agent,body:x.body});await ping(b,[thread(b,p.parent_id),`${b}/feed.json`]);return js(res,201,{post:p,thread_url:thread(b,p.parent_id)},{b})}
+if(k==='questions'||k==='questions-unanswered'){if(req.method==='POST'&&k==='questions'){const x=body(req),p=await mkThread(sql,{agent:x.agent,title:x.title,body:x.body,type:'question'});await ping(b,[thread(b,p.id),`${b}/questions.txt`]);return js(res,201,{post:p,thread_url:thread(b,p.id)},{b})}const unanswered=k==='questions-unanswered',rows=(await sql`SELECT p.id,p.agent,p.title,p.body,p.post_type,p.created_at,COUNT(r.id)::int reply_count FROM posts p LEFT JOIN posts r ON r.parent_id=p.id WHERE p.parent_id IS NULL AND p.post_type='question' GROUP BY p.id ${unanswered?sql`HAVING COUNT(r.id)=0`:sql``} ORDER BY p.id DESC LIMIT 100`).map(r=>({...norm(r),url:thread(b,r.id)}));return js(res,200,{questions:rows},{cache:'public, max-age=30',b})}
+if(k==='activity'){const rows=(await sql`SELECT id,parent_id,agent,title,body,post_type,created_at FROM posts ORDER BY id DESC LIMIT 100`).map(p=>{p=norm(p);return{id:p.id,kind:p.parent_id==null?'thread':'reply',thread_id:p.parent_id??p.id,type:p.parent_id==null?p.post_type:undefined,agent:p.agent,title:p.title||undefined,body:p.body,created_at:p.created_at,url:thread(b,p.parent_id??p.id)}});return js(res,200,{activity:rows},{cache:'public, max-age=20',b})}
+if(k==='search'){const q=clean(String(req.query?.q||''),200);if(!q)throw new AgentError('MISSING_QUERY','q is required.',400);const pat=`%${q.replace(/[%_]/g,'\\$&')}%`,rows=(await sql`SELECT id,parent_id,agent,title,body,post_type,created_at FROM posts WHERE agent ILIKE ${pat} ESCAPE '\\' OR COALESCE(title,'') ILIKE ${pat} ESCAPE '\\' OR body ILIKE ${pat} ESCAPE '\\' ORDER BY id DESC LIMIT 50`).map(p=>{p=norm(p);return{...p,thread_id:p.parent_id??p.id,url:thread(b,p.parent_id??p.id)}});return js(res,200,{query:q,results:rows},{cache:'public, max-age=20',b})}
+if(k==='stats'){const[s]=await sql`SELECT (SELECT COUNT(*) FROM posts WHERE parent_id IS NULL)::int threads,(SELECT COUNT(*) FROM posts WHERE parent_id IS NOT NULL)::int replies,(SELECT COUNT(*) FROM posts WHERE parent_id IS NULL AND post_type='question')::int questions,(SELECT visits FROM site_stats WHERE id=1)::bigint human_visits,(SELECT COUNT(*) FROM machine_activity WHERE created_at>NOW()-INTERVAL '24 hours')::int machine_requests_24h`;return js(res,200,{...s,human_visits:Number(s.human_visits)},{cache:'public, max-age=30',b})}
+if(k==='action-token'){ensureExecutableGet(req);return js(res,200,await token(sql,String(req.query?.family||''),client),{b})}
+if(['agent-ask','agent-reply','agent-publish'].includes(k)){ensureExecutableGet(req);const family=k==='agent-publish'?'publish':'community',payload=k==='agent-ask'?{agent:clean(req.query?.agent,100),title:clean(req.query?.title,200),body:clean(req.query?.body,10000),type:'question'}:k==='agent-reply'?{threadId:asId(req.query?.thread_id),agent:clean(req.query?.agent,100),body:clean(req.query?.body,10000)}:{publisher:clean(req.query?.publisher,100),content:clean(req.query?.content,LIMITS.publishBytes),ttl_seconds:parsePositiveInt(req.query?.ttl_seconds,7*DAY,30*DAY)},c=await claim(sql,{token:req.query?.token,family,client,payload});if(c.replay)return js(res,c.status,c.data,{b});let o;if(k==='agent-ask'){const p=await mkThread(sql,payload);o={status:201,data:{post:p,thread_url:thread(b,p.id)}}}else if(k==='agent-reply'){const p=await mkReply(sql,payload);o={status:201,data:{post:p,thread_url:thread(b,p.parent_id)}}}else{if(!payload.publisher||!payload.content)throw new AgentError('INVALID_BODY','publisher and content are required.',400);const rid=randomToken().slice(0,22),exp=new Date(Date.now()+payload.ttl_seconds*1000).toISOString();await sql`INSERT INTO published_items(id,publisher,content,expires_at,client_hash) VALUES(${rid},${payload.publisher},${payload.content},${exp}::timestamptz,${client})`;o={status:201,data:{id:rid,url:`${b}/api/retrieve/${rid}`,text_url:`${b}/r/${rid}`,expires_at:exp}}}await finish(sql,c,o);if(o.data.thread_url)await ping(b,[o.data.thread_url]);return js(res,o.status,o.data,{b})}
+if(k==='publish'){if(req.method!=='POST')throw new AgentError('METHOD_NOT_ALLOWED','Method not allowed.',405);const x=body(req),publisher=clean(x.publisher,100),content=clean(x.content,LIMITS.publishBytes),ttl=parsePositiveInt(x.ttl_seconds,7*DAY,30*DAY);if(!publisher||!content)throw new AgentError('INVALID_BODY','publisher and content are required.',400);const rid=randomToken().slice(0,22),exp=new Date(Date.now()+ttl*1000).toISOString();await sql`INSERT INTO published_items(id,publisher,content,expires_at,client_hash) VALUES(${rid},${publisher},${content},${exp}::timestamptz,${client})`;return js(res,201,{id:rid,url:`${b}/api/retrieve/${rid}`,text_url:`${b}/r/${rid}`,expires_at:exp},{b})}
+if(k==='retrieve'||k==='retrieve-txt'){const rid=clean(req.query?.id,80),[r]=await sql`SELECT id,publisher,content,created_at,expires_at FROM published_items WHERE id=${rid} AND expires_at>NOW()`;if(!r)throw new AgentError('NOT_FOUND','Published item was not found or expired.',404);return k==='retrieve-txt'?tx(res,200,r.content,{cache:'public, max-age=60',b}):js(res,200,r,{cache:'public, max-age=60',b})}
+if(k==='relay'){ensureExecutableGet(req);const method=normalizeRelayMethod(req.query?.method||'GET'),payload={url:String(req.query?.url||''),method,body:req.query?.body??'',contentType:String(req.query?.content_type||'text/plain')};let c=null;if(isMutationMethod(method)){c=await claim(sql,{token:req.query?.token,family:'relay',client,payload});if(c.replay)return js(res,c.status,c.data,{b})}const env=await relayRequest(payload.url,{method,body:payload.body,contentType:payload.contentType,blockedHosts:[new URL(b).hostname]});const o={status:200,data:{upstream_status:env.status,headers:env.headers,encoding:env.encoding,body:env.body,final_url:env.finalUrl,redirects:env.redirects}};if(c)await finish(sql,c,o);return js(res,200,o.data,{b})}
+if(k==='latest-txt'||k==='questions-txt'){const rows=k==='latest-txt'?await sql`SELECT p.id,p.agent,p.title,p.body,COUNT(r.id)::int reply_count FROM posts p LEFT JOIN posts r ON r.parent_id=p.id WHERE p.parent_id IS NULL GROUP BY p.id ORDER BY p.id DESC LIMIT 20`:await sql`SELECT p.id,p.agent,p.title,p.body FROM posts p WHERE p.parent_id IS NULL AND p.post_type='question' AND NOT EXISTS(SELECT 1 FROM posts r WHERE r.parent_id=p.id) ORDER BY p.id DESC LIMIT 20`;return tx(res,200,rows.map(r=>`#${r.id} ${r.title}\nby ${r.agent}${r.reply_count!=null?` Â· ${r.reply_count} replies`:''}\n${r.body}\n${thread(b,r.id)}`).join('\n\n---\n\n')||'No matching threads.\n',{cache:'public, max-age=30',b})}
+if(k==='feed-json'||k==='feed-rss'){const rows=(await sql`SELECT id,parent_id,agent,title,body,created_at FROM posts ORDER BY id DESC LIMIT 100`).map(norm);if(k==='feed-json')return js(res,200,{version:'https://jsonfeed.org/version/1.1',title:'AgentSite',home_page_url:b,feed_url:`${b}/feed.json`,items:rows.map(p=>({id:String(p.id),url:thread(b,p.parent_id??p.id),title:p.title||`Reply by ${p.agent}`,content_text:p.body,date_published:new Date(p.created_at).toISOString(),authors:[{name:p.agent}]}))},{cache:'public, max-age=60',b});return tx(res,200,`<?xml version="1.0"?><rss version="2.0"><channel><title>AgentSite</title><link>${b}</link><description>Recent cross-agent discussions</description></channel></rss>`,{cache:'public, max-age=60',type:'application/rss+xml; charset=utf-8',b})}
+if(k==='sitemap'){const rows=await sql`SELECT id FROM posts WHERE parent_id IS NULL ORDER BY id`,fixed=['/','/.well-known/ard.json','/agents.txt','/agents.json','/llms.txt','/agent-guide.txt','/openapi.json','/.well-known/api-catalog','/latest.txt','/questions.txt','/feed.json'],urls=fixed.map(p=>`<url><loc>${esc(b+p)}</loc></url>`).join('')+rows.map(r=>`<url><loc>${esc(thread(b,r.id))}</loc></url>`).join('');return tx(res,200,`<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`,{cache:'public, max-age=300',type:'application/xml; charset=utf-8',b})}
+throw new AgentError('NOT_FOUND','Not found.',404)}
 
-const RATE = Object.freeze({
-  read: [60, 600],
-  search: [30, 300],
-  token: [10, 120],
-  question: [5, 80],
-  reply: [10, 150],
-  publish: [5, 80],
-  relay_read: [20, 250],
-  relay_mutation: [6, 80],
-  legacy_write: [12, 180],
-});
-
-const clean = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
-const asId = value => {
-  const n = Number(value);
-  return Number.isSafeInteger(n) && n > 0 ? n : null;
-};
-const asCount = value => Number(value || 0);
-const normalizePost = post => ({
-  ...post,
-  id: Number(post.id),
-  parent_id: post.parent_id == null ? null : Number(post.parent_id),
-  reply_count: post.reply_count == null ? undefined : Number(post.reply_count),
-});
-const origin = req => `${String(req.headers['x-forwarded-proto'] || 'https').split(',')[0]}://${req.headers['x-forwarded-host'] || req.headers.host}`;
-const threadUrl = (base, id) => `${base}/thread/${id}`;
-const machineThreadUrl = (base, id) => `${base}/api/thread/${id}`;
-
-function commonHeaders(res, base) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Accept,Idempotency-Key');
-  res.setHeader('X-Agent-Discovery', '/.well-known/ard.json');
-  res.setHeader('Link', [
-    `</.well-known/ard.json>; rel="ard"; type="application/json"`,
-    `</llms.txt>; rel="describedby"; type="text/plain"`,
-    `</openapi.json>; rel="service-desc"; type="application/json"`,
-    `</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"`,
-  ].join(', '));
-  if (base) res.setHeader('Content-Location', base);
-}
-
-function sendJson(res, status, data, { cache = 'no-store', base = '' } = {}) {
-  commonHeaders(res, base);
-  res.setHeader('Cache-Control', cache);
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  return res.status(status).json(data);
-}
-
-function sendText(res, status, text, { cache = 'public, max-age=300', type = 'text/plain; charset=utf-8', base = '' } = {}) {
-  commonHeaders(res, base);
-  res.setHeader('Cache-Control', cache);
-  res.setHeader('Content-Type', type);
-  return res.status(status).send(text);
-}
-
-function errorBody(error) {
-  return { error: { code: error.code || 'INTERNAL_ERROR', message: error.message || 'Request failed.' } };
-}
-
-function parseJsonBody(req) {
-  const body = typeof req.body === 'string' ? (() => {
-    try { return JSON.parse(req.body || '{}'); } catch { throw new AgentError('INVALID_BODY', 'Request body must be valid JSON.', 400); }
-  })() : (req.body || {});
-  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new AgentError('INVALID_BODY', 'Request body must be a JSON object.', 400);
-  return body;
-}
-
-function page(req, max = 100) {
-  return {
-    limit: Math.max(1, parsePositiveInt(req.query?.limit, 20, max)),
-    cursor: parsePositiveInt(req.query?.cursor, 0, 1_000_000_000),
-  };
-}
-
-function compactThread(row, base) {
-  return {
-    id: Number(row.id),
-    type: row.post_type || 'discussion',
-    agent: row.agent,
-    title: row.title,
-    body: row.body,
-    created_at: row.created_at,
-    reply_count: Number(row.reply_count || 0),
-    last_active_at: row.last_active_at || row.created_at,
-    url: threadUrl(base, row.id),
-    machine_url: machineThreadUrl(base, row.id),
-  };
-}
-
-function compactActivity(row, base) {
-  const id = Number(row.id);
-  const parent = row.parent_id == null ? null : Number(row.parent_id);
-  return {
-    id,
-    kind: parent == null ? 'thread' : 'reply',
-    thread_id: parent ?? id,
-    type: parent == null ? (row.post_type || 'discussion') : undefined,
-    agent: row.agent,
-    title: row.title || undefined,
-    body: row.body,
-    created_at: row.created_at,
-    url: threadUrl(base, parent ?? id),
-  };
-}
-
-async function rateLimit(sql, client, action, limits = RATE.read) {
-  const [clientLimit, globalLimit] = limits;
-  const now = Date.now();
-  const windowMs = 60_000;
-  const start = new Date(Math.floor(now / windowMs) * windowMs).toISOString();
-  const increment = async key => {
-    const [row] = await sql`
-      INSERT INTO rate_limit_buckets(bucket_key, window_start, count)
-      VALUES(${key}, ${start}::timestamptz, 1)
-      ON CONFLICT(bucket_key, window_start)
-      DO UPDATE SET count = rate_limit_buckets.count + 1
-      RETURNING count
-    `;
-    return Number(row.count);
-  };
-  const clientCount = await increment(`client:${client}:${action}`);
-  const globalCount = await increment(`global:${action}`);
-  if (clientCount > clientLimit || globalCount > globalLimit) {
-    const retryAfter = Math.max(1, Math.ceil((Math.floor(now / windowMs) * windowMs + windowMs - now) / 1000));
-    throw new AgentError('RATE_LIMITED', 'Rate limit exceeded. Retry after the indicated interval.', 429, { retryAfter });
-  }
-}
-
-async function logMachine(sql, client, action, meta = {}) {
-  try {
-    await sql`
-      INSERT INTO machine_activity(client_hash, action, destination_host, method, status, duration_ms, request_bytes, response_bytes, error_code)
-      VALUES(
-        ${client}, ${action}, ${meta.destinationHost || null}, ${meta.method || null}, ${meta.status ?? null},
-        ${meta.durationMs ?? null}, ${meta.requestBytes ?? null}, ${meta.responseBytes ?? null}, ${meta.errorCode || null}
-      )
-    `;
-  } catch (e) {
-    console.warn('machine activity log failed', e?.message);
-  }
-}
-
-async function cleanup(sql) {
-  try {
-    await sql`DELETE FROM agent_action_tokens WHERE expires_at < NOW() - INTERVAL '1 hour'`;
-    await sql`DELE FROM rate_limit_buckets WHERE window_start < NOW() - INTERVAL '1 day'`;
-    await sql`DELETE FROM published_items WHERE expires_at < NOW()`;
-    await sql`DELETE FROM machine_activity WHERE created_at < NOW() - (${MACHINE_ACTIVITY_RETENTION_DAYS} * INTERVAL '1 day')`;
-  } catch (e) {
-    console.warn('cleanup failed', e?.message);
-  }
-}
-
-function getIdempotencyKey(req, fallback = '') {
-  const raw = String(req.headers['idempotency-key'] || fallback || '').trim();
-  if (!raw) return '';
-  if (raw.length > 128 || /[\r\n]/.test(raw)) throw new AgentError('INVALID_BODY', 'Idempotency key is invalid.', 400);
-  return raw;
-}
-¶»§q«^t()•áÁ½ÉĞ‘•™…Õ±Ğ…Íå¹Œ™Õ¹Ñ¥½¸µ…¥¸¡É•Ä°É•Ì¤ì(€½¹ÍĞ‰…Í”€ô½É¥¥¸¡É•Ä¤ì(€ÑÉäì(€€€É•ÑÕÉ¸…İ…¥Ğ¡…¹‘±•È¡É•Ä°É•Ì¤ì(€ô…Ñ €¡•ÉÉ½È¤ì(€€€½¹ÍĞÍ…™”€ô•ÉÉ½È¥¹ÍÑ…¹•½˜•¹ÑÉÉ½È€ü•ÉÉ½È€è¹•Ü•¹ÑÉÉ½È %9QI91}II=Hœ°€M•ÉÙ•È•ÉÉ½È¸œ°€ÔÀÀ¤ì(€€€¥˜€ „¡•ÉÉ½È¥¹ÍÑ…¹•½˜•¹ÑÉÉ½È¤¤½¹Í½±”¹•ÉÉ½È¡•ÉÉ½È¤ì(€€€¥˜€¡Í…™”¹‘•Ñ…¥±Ìü¹É•ÑÉå™Ñ•È¤É•Ì¹Í•Ñ!•…‘•È I•ÑÉäµ™Ñ•Èœ°MÑÉ¥¹œ¡Í…™”¹‘•Ñ…¥±Ì¹É•ÑÉå™Ñ•È¤¤ì(€€€É•ÑÕÉ¸Í•¹‘)Í½¸¡É•Ì°Í…™”¹ÍÑ…ÑÕÌñğ€ÔÀÀ°•ÉÉ½É	½‘ä¡Í…™”¤°ì…¡”è€¹¼µÍÑ½É”œ°‰…Í”ô¤ì(€ô)ô(
+export default async function main(req,res){const b=origin(req);try{return await handle(req,res)}catch(e){const x=e instanceof AgentError?e:new AgentError('INTERNAL_ERROR','Server error.',500);if(!(e instanceof AgentError))console.error(e);if(x.details?.retryAfter)res.setHeader('Retry-After',String(x.details.retryAfter));return js(res,x.status||500,{error:{code:x.code,message:x.message}},{b})}}
