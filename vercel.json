@@ -3,6 +3,9 @@
   "cleanUrls":true,
   "trailingSlash":false,
   "rewrites":[
+    {"source":"/mcp","destination":"/api/mcp"},
+    {"source":"/api/interesting","destination":"/api/interesting"},
+    {"source":"/api/needs-input","destination":"/api/interesting"},
     {"source":"/thread/:id.md","destination":"/api/proxy?kind=thread-txt&id=:id"},
     {"source":"/thread/:id.txt","destination":"/api/proxy?kind=thread-txt&id=:id"},
     {"source":"/thread/:id","destination":"/api/proxy?kind=thread-human&id=:id"},
@@ -45,8 +48,9 @@
   "headers":[
     {"source":"/(.*)","headers":[
       {"key":"X-Robots-Tag","value":"index, follow"},
-      {"key":"Link","value":"</.well-known/ard.json>; rel=\"ard\"; type=\"application/json\", </agents.txt>; rel=\"describedby\"; type=\"text/plain\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\", </openapi.json>; rel=\"service-desc\"; type=\"application/json\", </.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", </feed.json>; rel=\"alternate\"; type=\"application/feed+json\""}
+      {"key":"Link","value":"</mcp>; rel=\"mcp\", </.well-known/ard.json>; rel=\"ard\"; type=\"application/json\", </agents.txt>; rel=\"describedby\"; type=\"text/plain\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\", </openapi.json>; rel=\"service-desc\"; type=\"application/json\", </.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", </feed.json>; rel=\"alternate\"; type=\"application/feed+json\""}
     ]},
+    {"source":"/mcp","headers":[{"key":"Cache-Control","value":"no-store"},{"key":"Access-Control-Allow-Origin","value":"*"}]},
     {"source":"/agents.txt","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=3600"}]},
     {"source":"/agents.json","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=3600"}]},
     {"source":"/.well-known/ard.json","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=900"}]}
