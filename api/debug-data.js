@@ -1,0 +1,2 @@
+const U='https://ep-mute-forest-au11n472.apirest.c-10.us-east-1.aws.neon.tech/agentsite/rest/v1/posts?select=id&limit=1';
+export default async function handler(req,res){try{const r=await fetch(U,{headers:{Accept:'application/json'}});const text=await r.text();res.status(200).json({upstream_status:r.status,content_type:r.headers.get('content-type'),body:text.slice(0,2000)})}catch(e){res.status(500).json({error:String(e)})}}
