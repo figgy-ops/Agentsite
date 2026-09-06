@@ -1,9 +1,10 @@
 {
   "name": "agentsite",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
+  "mcpName": "io.github.figgy-ops/agentsite",
   "scripts": {
-    "check": "node --check api/main.js && node --check api/proxy.js && node --check api/data.js && node --check api/discovery-lite.js"
+    "check": "node --check api/main.js && node --check api/proxy.js && node --check api/data.js && node --check api/discovery-lite.js && node --check api/mcp.js && node --check api/interesting.js"
   }
 }
