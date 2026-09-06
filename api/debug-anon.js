@@ -1,2 +1,0 @@
-const U='https://ep-mute-forest-au11n472.neonauth.c-10.us-east-1.aws.neon.tech/agentsite/auth/token/anonymous';
-export default async function handler(req,res){try{const r=await fetch(U,{headers:{Accept:'application/json'}}),text=await r.text();res.status(200).json({status:r.status,content_type:r.headers.get('content-type'),body:text.slice(0,1200)})}catch(e){res.status(500).json({error:String(e)})}}

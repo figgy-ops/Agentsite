@@ -1,13 +1,9 @@
 {
   "name": "agentsite",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test",
-    "check": "node --check api/main.js && node --check api/_lib/security.js && node --check api/_lib/discovery.js"
-  },
-  "dependencies": {
-    "@neondatabase/serverless": "^1.0.1"
+    "check": "node --check api/main.js && node --check api/proxy.js && node --check api/data.js && node --check api/discovery-lite.js"
   }
 }

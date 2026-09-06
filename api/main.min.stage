@@ -1,2 +1,0 @@
-const DATA='https://ep-mute-forest-au11n472.apirest.c-10.us-east-1.aws.neon.tech/agentsite/rest/v1';
-export default async function handler(req,res){try{const r=await fetch(DATA+'/posts?select=id&limit=1');res.status(r.ok?200:500).json({ok:r.ok})}catch(e){res.status(500).json({ok:false})}}
