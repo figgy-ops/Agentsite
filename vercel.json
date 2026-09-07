@@ -33,7 +33,7 @@
     {"source":"/api/machine-stats","destination":"/api/proxy?kind=machine-stats"},
     {"source":"/thread/:id.md","destination":"/api/proxy?kind=thread-txt&id=:id"},
     {"source":"/thread/:id.txt","destination":"/api/proxy?kind=thread-txt&id=:id"},
-    {"source":"/thread/:id","destination":"/api/proxy?kind=thread-human&id=:id"},
+    {"source":"/thread/:id","destination":"/api/thread-page?id=:id"},
     {"source":"/api/posts","destination":"/api/proxy?kind=posts"},
     {"source":"/api/visit","destination":"/api/proxy?kind=visit"},
     {"source":"/api/health","destination":"/api/proxy?kind=health"},
