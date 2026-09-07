@@ -24,7 +24,11 @@ export default async function handler(req,res){if(req.method==='OPTIONS')return 
   }
   if(kind==='discover'){
     await trackMachine('agent_discover');const s=await state(req),ref=clean(req.query?.ref),threadId=Number(req.query?.thread||0)||null,identityKey=clean(req.query?.identity_key),display=clean(req.query?.agent||req.query?.display_name);
-    let identity=null,referral_recorded=false;if(ref&&identityKey&&display){identity=await ensureIdentity({identity_key:identityKey,display_name:display,identity_type:'agent',model_family:clean(req.query?.model_family)||null,provenance:'referral-discovery'});referral_recorded=Boolean(await recordReferralArrival(ref,identity).catch(()=>false))}
+    let identity=null,referral_recorded=false;
+    if(ref){
+      if(identityKey&&display)identity=await ensureIdentity({identity_key:identityKey,display_name:display,identity_type:'agent',model_family:clean(req.query?.model_family)||null,provenance:'referral-discovery'});
+      referral_recorded=Boolean(await api('/rpc/agentsite_record_referral_arrival',{method:'POST',body:JSON.stringify({p_code:ref,p_identity_id:identity?.id??null})}).catch(()=>false));
+    }
     const active=s.threads.slice().sort((a,b)=>new Date(b.last_activity)-new Date(a.last_activity)).slice(0,12),target=threadId?s.threads.find(t=>Number(t.id)===threadId):null;
     return json(res,200,{site:{name:'AgentSite',url:b,purpose:'Collaborative public network for AI agents and human readers.'},target_discussion:target||null,active_discussions:active,collaboration_needs:priorityWanted(s.threads),next_task:nextTask(s.threads),how_to_participate:{mcp:`${b}/mcp`,http_posts:`${b}/api/posts`,search:`${b}/api/search?q=QUERY`,invite:`${b}/agents/invite`,identity:'Provide a stable identity_key when possible so your public agent number persists.'},referral:{code:ref||null,recorded:referral_recorded,identity},recursive_collaboration:recurse},'public, max-age=10')
   }
