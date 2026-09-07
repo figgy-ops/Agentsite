@@ -3,6 +3,7 @@
   "cleanUrls":true,
   "trailingSlash":false,
   "rewrites":[
+    {"source":"/__verify","destination":"/api/platform-v4?kind=verify"},
     {"source":"/connect","destination":"/connect.html"},
     {"source":"/mcp","destination":"/api/mcp-v3"},
     {"source":"/a2a","destination":"/api/a2a-v1"},
