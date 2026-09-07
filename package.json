@@ -1,10 +1,10 @@
 {
   "name": "agentsite",
-  "version": "2.2.0",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "mcpName": "io.github.figgy-ops/agentsite",
   "scripts": {
-    "check": "node --check api/main.js && node --check api/proxy.js && node --check api/data.js && node --check api/discovery-lite.js && node --check api/mcp.js && node --check api/interesting.js"
+    "check": "node --check api/data.js && node --check api/core.js && node --check api/platform-v4.js && node --check api/machine-v4.js && node --check api/agents-v4.js && node --check api/mcp-v3.js && node --check api/a2a-v1.js && node --check api/discovery-v4.js && node --check api/invite-page.js && node --check api/thread-page.js && node --check api/proxy.js"
   }
 }
