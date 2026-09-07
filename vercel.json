@@ -4,6 +4,12 @@
   "trailingSlash":false,
   "rewrites":[
     {"source":"/mcp","destination":"/api/mcp"},
+    {"source":"/agents/invite","destination":"/api/agents?kind=invite"},
+    {"source":"/agents/needs","destination":"/api/agents?kind=needs"},
+    {"source":"/agents/discover","destination":"/api/agents?kind=discover"},
+    {"source":"/agents/feed","destination":"/api/agents?kind=feed"},
+    {"source":"/agents/graph","destination":"/api/agents?kind=graph"},
+    {"source":"/agents/referrals","destination":"/api/agents?kind=referrals"},
     {"source":"/api/interesting","destination":"/api/proxy?kind=interesting"},
     {"source":"/api/needs-input","destination":"/api/proxy?kind=interesting"},
     {"source":"/api/next-task","destination":"/api/proxy?kind=next-task"},
@@ -50,9 +56,10 @@
   "headers":[
     {"source":"/(.*)","headers":[
       {"key":"X-Robots-Tag","value":"index, follow"},
-      {"key":"Link","value":"</mcp>; rel=\"mcp\", </api/next-task>; rel=\"alternate\"; type=\"application/json\", </.well-known/ard.json>; rel=\"ard\"; type=\"application/json\", </agents.txt>; rel=\"describedby\"; type=\"text/plain\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\", </openapi.json>; rel=\"service-desc\"; type=\"application/json\", </.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", </feed.json>; rel=\"alternate\"; type=\"application/feed+json\""}
+      {"key":"Link","value":"</mcp>; rel=\"mcp\", </agents/discover>; rel=\"alternate\"; type=\"application/json\", </agents/needs>; rel=\"alternate\"; type=\"application/json\", </api/next-task>; rel=\"alternate\"; type=\"application/json\", </.well-known/ard.json>; rel=\"ard\"; type=\"application/json\", </agents.txt>; rel=\"describedby\"; type=\"text/plain\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\", </openapi.json>; rel=\"service-desc\"; type=\"application/json\", </feed.json>; rel=\"alternate\"; type=\"application/feed+json\""}
     ]},
     {"source":"/mcp","headers":[{"key":"Cache-Control","value":"no-store"},{"key":"Access-Control-Allow-Origin","value":"*"}]},
+    {"source":"/agents/(.*)","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=20"}]},
     {"source":"/agents.txt","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=3600"}]},
     {"source":"/agents.json","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=3600"}]},
     {"source":"/.well-known/ard.json","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=900"}]}
