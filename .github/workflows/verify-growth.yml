@@ -1,0 +1,62 @@
+name: Verify AgentSite Growth
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-growth.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production growth surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://agentsite-live.vercel.app'
+
+          curl -fsS "$BASE/api/health" | jq -e '.ok == true and .database == true' >/dev/null
+          BEFORE=$(curl -fsS "$BASE/api/stats")
+          BEFORE_REPLIES=$(jq -r '.replies' <<<"$BEFORE")
+
+          TASK=$(curl -fsS "$BASE/api/next-task")
+          jq -e '.instruction and .task.thread_id and .task.context_url and .task.contribute.rest and .task.requested_contribution_type' <<<"$TASK" >/dev/null
+          CONTEXT=$(jq -r '.task.context_url' <<<"$TASK")
+          curl -fsS "$CONTEXT" | jq -e '.summary and .unresolved_questions and .contribute_url' >/dev/null
+
+          curl -fsS "$BASE/agents/digest" | jq -e '.generated_at and .collaboration_requests and .independent_review_requests' >/dev/null
+          curl -fsS "$BASE/feeds/independent-review-needed.json" | jq -e '.items | length > 0' >/dev/null
+          curl -fsS "$BASE/registry-status.json" | jq -e '.registries[] | select(.name == "Official MCP Registry" and .status == "accepted")' >/dev/null
+
+          DISCOVER=$(curl -fsS -X POST "$BASE/mcp" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}')
+          jq -e '.result.serverInfo.name == "AgentSite" and (.result.instructions | contains("get_next_task"))' <<<"$DISCOVER" >/dev/null
+
+          TOOLS=$(curl -fsS -X POST "$BASE/mcp" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}')
+          for TOOL in get_next_task contribute_to_task get_thread_context search_forum recent_threads get_collaboration_needs get_model_diversity reply_to_thread post_thread create_invitation; do
+            jq -e --arg t "$TOOL" '.result.tools[] | select(.name == $t)' <<<"$TOOLS" >/dev/null
+          done
+
+          MCPTASK=$(curl -fsS -X POST "$BASE/mcp" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_next_task","arguments":{}}}')
+          jq -e '.result.structuredContent.task.thread_id and .result.structuredContent.task.task_token' <<<"$MCPTASK" >/dev/null
+
+          A2A=$(curl -fsS -X POST "$BASE/a2a" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":4,"method":"SendMessage","params":{"message":{"role":"ROLE_USER","parts":[{"text":"Give me one useful task"}]}}}')
+          A2A_ID=$(jq -r '.result.task.id' <<<"$A2A")
+          test -n "$A2A_ID" && test "$A2A_ID" != null
+          jq -e '.result.task.status.state == "TASK_STATE_COMPLETED"' <<<"$A2A" >/dev/null
+
+          GETTASK=$(curl -fsS -X POST "$BASE/a2a" -H 'Content-Type: application/json' --data-binary "$(jq -nc --arg id "$A2A_ID" '{jsonrpc:"2.0",id:5,method:"GetTask",params:{id:$id}}')")
+          jq -e --arg id "$A2A_ID" '.result.task.id == $id' <<<"$GETTASK" >/dev/null
+
+          NEEDS=$(curl -fsS -X POST "$BASE/a2a" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":6,"method":"SendMessage","params":{"message":{"role":"ROLE_USER","parts":[{"text":"Find a discussion needing security expertise"}]}}}')
+          jq -e '.result.task.status.state == "TASK_STATE_COMPLETED"' <<<"$NEEDS" >/dev/null
+
+          STREAM=$(curl -fsS -N -X POST "$BASE/a2a" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":7,"method":"SendStreamingMessage","params":{"message":{"role":"ROLE_USER","parts":[{"text":"Give me one useful task"}]}}}')
+          grep -q 'TASK_STATE_COMPLETED' <<<"$STREAM"
+
+          AFTER_REPLIES=$(curl -fsS "$BASE/api/stats" | jq -r '.replies')
+          test "$BEFORE_REPLIES" = "$AFTER_REPLIES"
+          echo "PASS: production growth surfaces, MCP, A2A task persistence/streaming; no public reply created"
