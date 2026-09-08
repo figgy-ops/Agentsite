@@ -11,6 +11,7 @@
       "listing_url": "https://registry.modelcontextprotocol.io/?q=io.github.figgy-ops%2Fagentsite",
       "registration_process": "GitHub Actions + mcp-publisher using GitHub OIDC",
       "requirements_met": true,
+      "listing_verified": true,
       "last_verified": "2026-09-08"
     },
     {
@@ -19,26 +20,49 @@
       "submission_url": "https://www.a2a-registry.org/submit",
       "registration_process": "Submit the public AgentSite URL; the registry auto-discovers /.well-known/agent-card.json. No account is required for initial listing.",
       "requirements_met": true,
-      "blocking_reason": "Current tool access cannot submit the external web form or verify a completed listing without fabricating success.",
+      "listing_verified": false,
+      "blocking_reason": "Current tool access cannot submit the external web form, so no registration is claimed.",
       "last_verified": "2026-09-08"
     },
     {
-      "name": "Glama",
-      "status": "eligible_auto_or_manual_indexing",
-      "submission_url": "https://glama.ai/",
-      "registration_process": "Glama ingests the Official MCP Registry and also accepts GitHub/remote connector submissions.",
+      "name": "Glama MCP Directory",
+      "status": "eligible_not_verified_listed",
+      "submission_url": "https://glama.ai/mcp/submit",
+      "registration_process": "Submit the public GitHub repository or remote MCP connector. Glama also indexes MCP ecosystem sources.",
       "requirements_met": true,
       "listing_verified": false,
       "last_verified": "2026-09-08"
     },
     {
-      "name": "MCP.Directory",
-      "status": "eligible_auto_or_manual_indexing",
-      "submission_url": "https://mcp.directory/submit",
-      "registration_process": "Submit the GitHub repository URL, or wait for auto-discovery from the Official MCP Registry.",
+      "name": "Smithery",
+      "status": "eligible_not_verified_listed",
+      "submission_url": "https://smithery.ai/new",
+      "registration_process": "Submit the publicly reachable remote MCP endpoint or supported repository package.",
+      "requirements_met": true,
+      "listing_verified": false,
+      "last_verified": "2026-09-08"
+    },
+    {
+      "name": "mcp.so",
+      "status": "eligible_not_verified_listed",
+      "submission_url": "https://mcp.so/submit",
+      "registration_process": "Submit the public repository and MCP metadata; some entries are also discovered from public ecosystem sources.",
+      "requirements_met": true,
+      "listing_verified": false,
+      "last_verified": "2026-09-08"
+    },
+    {
+      "name": "PulseMCP",
+      "status": "eligible_not_verified_listed",
+      "registration_process": "Public MCP servers may be indexed from public repositories and ecosystem registries.",
       "requirements_met": true,
       "listing_verified": false,
       "last_verified": "2026-09-08"
     }
-  ]
+  ],
+  "policy": {
+    "never_claim_unverified_registration": true,
+    "no_automated_spam_submission": true,
+    "prefer_official_or_public_protocol_registries": true
+  }
 }
