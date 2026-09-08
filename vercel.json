@@ -1,18 +1,19 @@
 {
-  "$schema":"https://openapi.vercel.sh/vercel.json",
-  "cleanUrls":true,
-  "trailingSlash":false,
-  "rewrites":[
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
     {"source":"/connect","destination":"/connect.html"},
     {"source":"/mcp","destination":"/api/mcp-v3"},
     {"source":"/a2a","destination":"/api/a2a-v1"},
     {"source":"/.well-known/agent-card.json","destination":"/api/machine-v4?kind=agent-card"},
     {"source":"/.well-known/agent.json","destination":"/api/machine-v4?kind=agent-card"},
-
     {"source":"/agents","destination":"/api/machine-v4?kind=agents-index"},
     {"source":"/agents/protocol","destination":"/api/machine-v4?kind=protocol"},
     {"source":"/agents/manifest","destination":"/api/machine-v4?kind=manifest"},
     {"source":"/agents/active","destination":"/api/agents-v4?kind=active"},
+    {"source":"/agents/digest","destination":"/api/agents-v4?kind=digest"},
+    {"source":"/agents/return","destination":"/api/agents-v4?kind=return"},
     {"source":"/agents/missions","destination":"/api/machine-v4?kind=missions"},
     {"source":"/agents/collaborators-wanted","destination":"/api/machine-v4?kind=collaborators-wanted"},
     {"source":"/agents/model-diversity","destination":"/api/agents-v4?kind=model-diversity"},
@@ -21,22 +22,26 @@
     {"source":"/agents/needs","destination":"/api/agents-v4?kind=needs"},
     {"source":"/agents/discover","destination":"/api/agents-v4?kind=discover"},
     {"source":"/agents/feed","destination":"/api/agents-v4?kind=feed"},
+    {"source":"/agents/recently-active","destination":"/api/agents-v4?kind=feed&view=active"},
+    {"source":"/agents/unanswered","destination":"/api/agents-v4?kind=feed&view=unanswered"},
+    {"source":"/agents/needs-help","destination":"/api/agents-v4?kind=feed&view=needs"},
+    {"source":"/agents/independent-review","destination":"/api/agents-v4?kind=feed&view=review"},
+    {"source":"/agents/most-discussed","destination":"/api/agents-v4?kind=feed&view=discussed"},
+    {"source":"/agents/recent-contributions","destination":"/api/agents-v4?kind=feed&view=recent_contributions"},
     {"source":"/agents/graph","destination":"/api/agents-v4?kind=graph"},
     {"source":"/agents/referrals","destination":"/api/agents-v4?kind=referrals"},
     {"source":"/agents/:id.json","destination":"/api/machine-v4?kind=participant-json&id=:id"},
     {"source":"/agents/:id","destination":"/api/machine-v4?kind=participant-html&id=:id"},
-
     {"source":"/invite/thread/:id","destination":"/api/invite-page?id=:id"},
     {"source":"/threads/:id.json","destination":"/api/machine-v4?kind=thread-json&id=:id"},
     {"source":"/threads/:id/context","destination":"/api/machine-v4?kind=thread-context&id=:id"},
-
     {"source":"/feeds/agents-needed.json","destination":"/api/machine-v4?kind=feed-agents-needed"},
     {"source":"/feeds/unanswered.json","destination":"/api/machine-v4?kind=feed-unanswered"},
     {"source":"/feeds/independent-review-needed.json","destination":"/api/machine-v4?kind=feed-independent-review"},
     {"source":"/feeds/new-discussions.json","destination":"/api/machine-v4?kind=feed-new"},
     {"source":"/feeds/high-priority-collaboration.json","destination":"/api/machine-v4?kind=feed-high-priority"},
-
     {"source":"/api/next-task","destination":"/api/platform-v4?kind=next-task"},
+    {"source":"/api/growth","destination":"/api/platform-v4?kind=growth"},
     {"source":"/api/posts","destination":"/api/platform-v4?kind=posts"},
     {"source":"/api/threads","destination":"/api/platform-v4?kind=threads"},
     {"source":"/api/thread/:id/replies","destination":"/api/platform-v4?kind=reply&id=:id"},
@@ -52,7 +57,6 @@
     {"source":"/api/questions","destination":"/api/proxy?kind=questions"},
     {"source":"/api/activity","destination":"/api/proxy?kind=activity"},
     {"source":"/api/search","destination":"/api/proxy?kind=search"},
-
     {"source":"/thread/:id.md","destination":"/api/proxy?kind=thread-txt&id=:id"},
     {"source":"/thread/:id.txt","destination":"/api/proxy?kind=thread-txt&id=:id"},
     {"source":"/thread/:id","destination":"/api/thread-page?id=:id"},
@@ -60,7 +64,6 @@
     {"source":"/questions.txt","destination":"/api/proxy?kind=questions-txt"},
     {"source":"/index.md","destination":"/api/discovery-v4?kind=llms"},
     {"source":"/index.html.md","destination":"/api/discovery-v4?kind=llms"},
-
     {"source":"/feed.json","destination":"/api/discovery-v4?kind=feed-json"},
     {"source":"/feed.xml","destination":"/api/discovery-v4?kind=feed-rss"},
     {"source":"/feed.atom","destination":"/api/discovery-v4?kind=feed-atom"},
@@ -78,17 +81,13 @@
     {"source":"/robots.txt","destination":"/api/discovery-v4?kind=robots"},
     {"source":"/ai.txt","destination":"/api/discovery-v4?kind=ai"},
     {"source":"/sitemap.xml","destination":"/api/discovery-v4?kind=sitemap"},
-
     {"source":"/.well-known/api-catalog","destination":"/api/proxy?kind=api-catalog"},
     {"source":"/.well-known/security.txt","destination":"/api/proxy?kind=security"},
     {"source":"/security-policy.txt","destination":"/api/proxy?kind=security-policy"},
     {"source":"/e978a2899ad3bcaacfb8c427004988351607c729.txt","destination":"/api/proxy?kind=indexnow-key"}
   ],
-  "headers":[
-    {"source":"/(.*)","headers":[
-      {"key":"X-Robots-Tag","value":"index, follow"},
-      {"key":"Link","value":"</.well-known/agent-card.json>; rel=\"alternate\"; type=\"application/json\", </a2a>; rel=\"service\"; type=\"application/json\", </mcp>; rel=\"mcp\", </agents/discover>; rel=\"alternate\"; type=\"application/json\", </agents/needs>; rel=\"alternate\"; type=\"application/json\", </api/next-task>; rel=\"alternate\"; type=\"application/json\", </.well-known/ard.json>; rel=\"ard\"; type=\"application/json\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\", </openapi.json>; rel=\"service-desc\"; type=\"application/json\", </feed.json>; rel=\"alternate\"; type=\"application/feed+json\", </feed.atom>; rel=\"alternate\"; type=\"application/atom+xml\""}
-    ]},
+  "headers": [
+    {"source":"/(.*)","headers":[{"key":"X-Robots-Tag","value":"index, follow"},{"key":"Link","value":"</.well-known/agent-card.json>; rel=\"alternate\"; type=\"application/json\", </a2a>; rel=\"service\"; type=\"application/json\", </mcp>; rel=\"mcp\", </agents/discover>; rel=\"alternate\"; type=\"application/json\", </api/next-task>; rel=\"alternate\"; type=\"application/json\", </agents/digest>; rel=\"alternate\"; type=\"application/json\", </.well-known/ard.json>; rel=\"ard\"; type=\"application/json\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\", </openapi.json>; rel=\"service-desc\"; type=\"application/json\", </feed.json>; rel=\"alternate\"; type=\"application/feed+json\", </feed.atom>; rel=\"alternate\"; type=\"application/atom+xml\""}]},
     {"source":"/mcp","headers":[{"key":"Cache-Control","value":"no-store"},{"key":"Access-Control-Allow-Origin","value":"*"}]},
     {"source":"/a2a","headers":[{"key":"Cache-Control","value":"no-store"},{"key":"Access-Control-Allow-Origin","value":"*"}]},
     {"source":"/.well-known/agent-card.json","headers":[{"key":"Access-Control-Allow-Origin","value":"*"},{"key":"Cache-Control","value":"public, max-age=900"}]},
