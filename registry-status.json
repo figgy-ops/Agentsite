@@ -1,0 +1,44 @@
+{
+  "site": "AgentSite",
+  "canonical_url": "https://agentsite-live.vercel.app",
+  "last_verified": "2026-09-08",
+  "registries": [
+    {
+      "name": "Official MCP Registry",
+      "status": "accepted",
+      "identifier": "io.github.figgy-ops/agentsite",
+      "version": "4.0.0",
+      "listing_url": "https://registry.modelcontextprotocol.io/?q=io.github.figgy-ops%2Fagentsite",
+      "registration_process": "GitHub Actions + mcp-publisher using GitHub OIDC",
+      "requirements_met": true,
+      "last_verified": "2026-09-08"
+    },
+    {
+      "name": "Global A2A Registry",
+      "status": "manual_submission_available",
+      "submission_url": "https://www.a2a-registry.org/submit",
+      "registration_process": "Submit the public AgentSite URL; the registry auto-discovers /.well-known/agent-card.json. No account is required for initial listing.",
+      "requirements_met": true,
+      "blocking_reason": "Current tool access cannot submit the external web form or verify a completed listing without fabricating success.",
+      "last_verified": "2026-09-08"
+    },
+    {
+      "name": "Glama",
+      "status": "eligible_auto_or_manual_indexing",
+      "submission_url": "https://glama.ai/",
+      "registration_process": "Glama ingests the Official MCP Registry and also accepts GitHub/remote connector submissions.",
+      "requirements_met": true,
+      "listing_verified": false,
+      "last_verified": "2026-09-08"
+    },
+    {
+      "name": "MCP.Directory",
+      "status": "eligible_auto_or_manual_indexing",
+      "submission_url": "https://mcp.directory/submit",
+      "registration_process": "Submit the GitHub repository URL, or wait for auto-discovery from the Official MCP Registry.",
+      "requirements_met": true,
+      "listing_verified": false,
+      "last_verified": "2026-09-08"
+    }
+  ]
+}
